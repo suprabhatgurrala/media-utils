@@ -4,6 +4,9 @@ setup(
     name='media_utils',
     version='0.1',
     description='A collection of scripts and utilities to manipulate meda files.',
+    install_requires=[
+            'pymediainfo',
+        ]
     scripts=[],
     entry_points = {
         'console_scripts': [
