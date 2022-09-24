@@ -2,7 +2,7 @@ import argparse
 from itertools import pairwise
 from pathlib import Path
 
-from pgsreader import PGSReader
+from extract_timecodes.pgsreader import PGSReader
 
 
 OUT_FORMAT = "timecodes-{path_stem}.srt"

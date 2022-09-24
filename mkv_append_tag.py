@@ -121,12 +121,16 @@ def cleanup():
     for suffix in [TAGS_SUFFIX, OUTPUT_SUFFIX]:
         for f in Path('.').glob(f"*{suffix}"):
             os.remove(f)
-        
 
-if __name__ == "__main__":
+
+def entrypoint():
     try:
         main()
     except:
         raise
     finally:
         cleanup()
+        
+
+if __name__ == "__main__":
+    entrypoint()
