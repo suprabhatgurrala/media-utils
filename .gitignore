@@ -128,4 +128,4 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-plex_extras_thumbnail/config.json
+**/config.json
