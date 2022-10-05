@@ -1,0 +1,5 @@
+{
+	"PLEX_HOME": "<Path to PLEX_HOME directory>",
+	"PLEX_SERVER_URL": "<URL of Plex Server>",
+	"PLEX_TOKEN": "<Plex API Token>"
+}
