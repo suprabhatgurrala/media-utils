@@ -6,55 +6,96 @@ import shutil
 import sys
 
 from plexapi.server import PlexServer
-import tqdm
+from pythumb import Thumbnail
+from tqdm import tqdm
 
 
-config_file = Path(__file__) / "config.json"
-
-with open(config_file, 'r') as f:
-	config = json.load()
-
-PLEX_MEDIA_PATH = Path(config['PLEX_HOME']) / "Library/Application Support/Plex Media Server/Media"
-
-parser = argparse.ArgumentParser(description="Replace the thumbnail of an Extra in a Plex library.")
-parser.add_argument('library', type=str, help="Name of the Plex library which the Extra is in")
-parser.add_argument('title', type=str, help="Title of the movie/show of the Extra")
-parser.add_argument('extra_name', type=str, help="Name of the Extra")
-parser.add_argument('thumbnail', type=str, help="Path to the new thumbnail image") # TODO: Accept a YouTube link and automatically pull the thumbnail
-
-args = parser.parse_args()
-
-plex = PlexServer(config['PLEX_SERVER_URL'], config['PLEX_TOKEN'])
-library = plex.library.section(args.library)
-titles = library.search(title=args.title)
-
-if len(titles) == 0:
-	print(f"No results found for {args.title} in {args.library}")
-	sys.exit()
-elif len(titles) > 1:
-	print(f"{len(titles)} results found for {args.title} in {args.library}, choosing the first result.")
-
-title = titles[0]
-print(f"Found title {title.title} ({title.year})")
-
-target_time = None
-for extra in title.extras:
-	if extra.title == args.extra_name:
-		extra_path = Path(extra.locations[0])
-		print(f"Found Extra file {extra_path.name}")
-		target_time = extra_path.stat().st_ctime
-
-thumb_path = None
-
-for thumb in tqdm(PLEX_MEDIA_PATH.rglob("thumb1.jpg")):
-	thumb_time = thumb.stat().st_ctime
-
-	if thumb_time - target_time < 60 * 1000:
-		print(f"Found thumbnail directory {thumb}")
-		thumb_path = thumb
-
-if thumb_path is None:
-	print("Could not find matching thumbnail path.")
-	sys.exit()
+CONFIG_PATH = Path(__file__).parent / "config.json"
 
 
+def main():
+	with open(CONFIG_PATH, 'r') as f:
+		config = json.load(f)
+	
+	plex_media_path = Path(config['PLEX_HOME']) / "Library/Application Support/Plex Media Server/Media"
+	
+	parser = argparse.ArgumentParser(description="Replace the thumbnail of an Extra in a Plex library.")
+	parser.add_argument('library', type=str, help="Name of the Plex library which the Extra is in")
+	parser.add_argument('title', type=str, help="Title of the movie/show of the Extra")
+	parser.add_argument('extra_name', type=str, help="Name of the Extra")
+	parser.add_argument('thumbnail', type=str, help="Path to the new thumbnail image or a YouTube link")
+
+	args = parser.parse_args()
+
+	plex = PlexServer(config['PLEX_SERVER_URL'], config['PLEX_TOKEN'])
+	library = plex.library.section(args.library)
+	titles = library.search(title=args.title)
+
+	yt = False
+	if args.thumbnail[0:4] == "http":
+		t = Thumbnail('http://www.youtube.com/watch?v=2m1drlOZSDw')
+		t.fetch()
+		thumb_path = Path(t.save('.', overwrite=True))
+		yt = True
+	else:
+		thumb_path = Path(args.thumbnail)
+		if not thumb_path.exists():
+			print(f"{thumb_path} does not exist.")
+			sys.exit()
+
+	if len(titles) == 0:
+		print(f"No results found for {args.title} in {args.library}")
+		sys.exit()
+	elif len(titles) > 1:
+		print(f"{len(titles)} results found for {args.title} in {args.library}, choosing the first result.")
+
+	title = titles[0]
+	print(f"Found title {title.title} ({title.year})")
+
+	target_time = None
+	extra_path = None
+	for extra in title.extras():
+		if extra.title == args.extra_name:
+			extra_path = Path(extra.locations[0])
+			target_time = datetime.fromtimestamp(extra_path.stat().st_mtime)
+			print(f'Found Extra file "{extra_path.name}", created on {target_time.isoformat()}')
+
+	if extra_path is None or target_time is None:
+		print(f"Could not find an Extra matching {args.extra_name}")
+		sys.exit()
+
+	print("Searching for matching thumbnail path...")
+	thumb_paths = []
+	for thumb in tqdm(plex_media_path.rglob("thumb1.jpg")):
+		thumb_time = datetime.fromtimestamp(thumb.stat().st_mtime)
+
+		if abs(thumb_time - target_time).total_seconds() < 30:
+			thumb_paths.append(thumb)
+
+	if len(thumb_paths) == 0:
+		print("\nCould not find matching thumbnail path.")
+		sys.exit()
+	elif len(thumb_paths) > 1:
+		print("There are multiple possible matching thumbnail paths:")
+		for path in thumb_paths:
+			print(path)
+		sys.exit()
+	else:
+		print(f"Found matching thumbnail path: {thumb_paths[0]}")
+
+	thumb_paths[0].unlink()
+	shutil.copy2(thumb_path, thumb_paths[0])
+	print("Successfully replaced thumbnail.")
+
+	if yt:
+		thumb_path.unlink()
+
+	# TODO: Removing and re-adding the file will force Plex to use the new thumbnail
+	# shutil.move(extra_path, "..")
+	# library.update()
+	# shutil.move(extra_path, "..")
+	# library.update()
+
+
+if __name__ == "__main__":
+    main()
