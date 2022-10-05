@@ -6,3 +6,20 @@ It's impossible to reverse engineer how exactly the hash is generated.
 Some experimentation shows that it is likely some combination of the movie the Extra is associated with and the hash of the Extra file itself.
 Instead we can search the Plex metadata directory for files that were updated around the same time as when the Extra was added.
 Once we find the directory we can overwrite the thumbnail.
+
+## Usage
+```
+usage: set_extra_thumbnail [-h] library title extra_name thumbnail
+
+Replace the thumbnail of an Extra in a Plex library.
+
+positional arguments:
+  library     Name of the Plex library which the Extra is in
+  title       Title of the movie/show of the Extra
+  extra_name  Name of the Extra
+  thumbnail   Path to the new thumbnail image or a YouTube link
+
+options:
+  -h, --help  show this help message and exit
+
+```
