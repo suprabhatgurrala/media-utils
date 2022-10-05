@@ -8,7 +8,7 @@ Instead we can search the Plex metadata directory for files that were updated ar
 Once we find the directory we can overwrite the thumbnail.
 
 ## Configuration
-This tool requires the following config values to be set in `config.json`.
+This tool requires the following config values to be set in [`config.json`](config.json).
 
 - `PLEX_HOME` - path to the home directory of your Plex install
 - `PLEX_SERVER_URL` - URL to your Plex server
