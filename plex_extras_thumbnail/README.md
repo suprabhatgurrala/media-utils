@@ -7,6 +7,13 @@ Some experimentation shows that it is likely some combination of the movie the E
 Instead we can search the Plex metadata directory for files that were updated around the same time as when the Extra was added.
 Once we find the directory we can overwrite the thumbnail.
 
+## Configuration
+This tool requires the following config values to be set in `config.json`.
+
+- `PLEX_HOME` - path to the home directory of your Plex install
+- `PLEX_SERVER_URL` - URL to your Plex server
+- `PLEX_TOKEN` - account authentication token, see [this Plex support page](https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/) for instructions on how to get your auth token
+
 ## Usage
 ```
 usage: set_extra_thumbnail [-h] library title extra_name thumbnail
