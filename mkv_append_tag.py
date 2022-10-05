@@ -52,7 +52,6 @@ def main():
                 track_tags_to_append[track_uid] = [(key, val)]
 
     run(["mkvextract", input_file, "tags", xml_filename])
-    print("Extracted existing tags.")
 
     tree = ET.parse(xml_filename)
     root = tree.getroot()
