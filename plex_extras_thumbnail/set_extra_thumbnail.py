@@ -69,7 +69,7 @@ def main():
 	for thumb in tqdm(plex_media_path.rglob("thumb1.jpg")):
 		thumb_time = datetime.fromtimestamp(thumb.stat().st_mtime)
 
-		if abs(thumb_time - target_time).total_seconds() < 30:
+		if abs(thumb_time - target_time).total_seconds() < 120:
 			thumb_paths.append(thumb)
 
 	if len(thumb_paths) == 0:
