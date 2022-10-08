@@ -19,7 +19,8 @@ setup(
             'combine_chapters=combine_chapters:main',
             'gifenc=gifenc:main',
             'merge_subs=merge_subs:main',
-            'set_extra_thumbnail=plex_extras_thumbnail.set_extra_thumbnail:main'
+            'set_extra_thumbnail=plex_extras_thumbnail.set_extra_thumbnail:main',
+            'rename_chapters=rename_chapters:entrypoint'
         ],
     }
 )
