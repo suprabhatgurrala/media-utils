@@ -1,5 +1,5 @@
 import argparse
-import sys
+import json
 from pathlib import Path
 from subprocess import run, CalledProcessError
 
@@ -9,17 +9,19 @@ from pymediainfo import MediaInfo
 DV_STREAM_SUFFIX = "_dovi.hevc"
 BASE_STREAM_SUFFIX = "_hdr10.hevc"
 RPU_SUFFIX = "_RPU.bin"
+RPU_EDITED_SUFFIX = "_RPU_edited.bin"
 OUT_SUFFIX = "_injected.hevc"
+EDIT_SUFFIX = "_edit.json"
 
 DV_P5_STR = "dvhe.05"
 
 
 def main():
     parser = argparse.ArgumentParser(description="Inject Dolby Vision metadata from a profile 5 file into an HDR10 file to create a profile 8 video stream.")
-    parser.add_argument('ffmpeg', type=str, help="Path to ffmpeg executable")
-    parser.add_argument('dovi_tool', type=str, help="Path to dovi_tool executable")
     parser.add_argument('dv', type=str, help="Path to Dolby Vision profile 5 video file (or directory of files)")
     parser.add_argument('hdr10', type=str, help="Path to HDR10 base video file (or directory of files)")
+    parser.add_argument('--ffmpeg', type=str, help="Path to ffmpeg executable", default="ffmpeg")
+    parser.add_argument('--dovi_tool', type=str, help="Path to dovi_tool executable", default="dovi_tool")
     parser.add_argument('--mkvextract', default=False, type=bool, action=argparse.BooleanOptionalAction, 
         help="Use mkvextract to create raw HEVC stream instead of ffmpeg. In some cases the HEVC stream created by ffmpeg can cause errors, using mkvextract may help."
         )
@@ -65,7 +67,7 @@ def main():
 
 def cleanup():
     print("Cleaning up temp files...\n")
-    for suffix in [DV_STREAM_SUFFIX, BASE_STREAM_SUFFIX, RPU_SUFFIX]:
+    for suffix in [DV_STREAM_SUFFIX, BASE_STREAM_SUFFIX, RPU_SUFFIX, EDIT_SUFFIX, RPU_EDITED_SUFFIX]:
         for f in Path.cwd().glob(f"*{suffix}"):
             f.unlink(missing_ok=True)
 
@@ -114,6 +116,43 @@ def create_hybrid(ffmpeg, dovi_tool, dv_path, base_path, mkvextract=False, dv_na
             check=True
         )
 
+    print("Extracting Dolby Vision RPU...")
+    # TODO: Handle cases where RPU conversion fails and metadata requires editing
+    rpu_bin = Path(dv_path.stem + RPU_SUFFIX)
+    try:
+        run([dovi_tool, "-m", "3", "extract-rpu", dv_stream, "-o", rpu_bin], check=True)
+    except CalledProcessError:
+        print("Failed to convert RPU. Retrying with an edited RPU...")
+        run([dovi_tool, "extract-rpu", dv_stream, "-o", rpu_bin], check=True)
+
+        min_mdl_str, max_mdl_str = base_track['mastering_display_luminance'].split(',')
+
+        min_mdl = int(float(min_mdl_str.replace("min:", "").replace("cd/m2", "").strip()) * 10000)
+        max_mdl = int(max_mdl_str.replace("max:", "").replace("cd/m2", "").strip())
+
+        max_cll = int(base_track['maximum_content_light_level'].replace('cd/m2','').strip())
+        max_fall = int(base_track['maximum_frameaverage_light_level'].replace('cd/m2','').strip())
+
+        metadata_edit = {
+            "mode": 3,
+            "level6": {
+                "max_display_mastering_luminance": max_mdl,
+                "min_display_mastering_luminance": min_mdl,
+                "max_content_light_level": max_cll,
+                "max_frame_average_light_level": max_fall
+            }
+        }
+
+        json_edit_file = dv_path.stem + EDIT_SUFFIX
+
+        with open(json_edit_file, "w+") as f:
+            json.dump(metadata_edit, f)
+
+        rpu_edited_bin = dv_path.stem + RPU_EDITED_SUFFIX
+        run([dovi_tool, "editor", "-i", rpu_bin, "-j", json_edit_file, "-o", rpu_edited_bin], check=True)
+        rpu_bin = rpu_edited_bin
+        print("Metadata successfully edited.")
+    
     if base_track.get('framerate_num') and base_track.get('framerate_den'):
         base_framerate_str = f"{base_track.get('framerate_num')}/{base_track.get('framerate_den')}"
     else:
@@ -129,24 +168,17 @@ def create_hybrid(ffmpeg, dovi_tool, dv_path, base_path, mkvextract=False, dv_na
             check=True
         )
 
-    print("Extracting Dolby Vision RPU...")
-    # TODO: Handle cases where RPU conversion fails and metadata requires editing
-    run(
-        [dovi_tool, "-m", "3", "extract-rpu", dv_stream, "-o", dv_path.stem + RPU_SUFFIX],
-        check=True
-    )
-
     print("Injecting DV metadata into HDR10 base...")
     if dv_name:
         out_name = dv_path.stem + OUT_SUFFIX
     else:
         out_name = base_path.stem + OUT_SUFFIX
     run(
-        [dovi_tool, "inject-rpu", "-i", base_stream, "--rpu-in", RPU_TEMP, "-o", out_name],
+        [dovi_tool, "inject-rpu", "-i", base_stream, "--rpu-in", rpu_bin, "-o", out_name],
         check=True
     )
     print("Successfully created hybrid video stream!")
-    
+
 
 if __name__ == "__main__":
     main()
