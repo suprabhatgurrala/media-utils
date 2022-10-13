@@ -89,16 +89,20 @@ def create_hybrid(ffmpeg, dovi_tool, dv_path, base_path, mkvextract=False, dv_na
 
     base_track = base_info.video_tracks[0].to_data()
 
-    # Confirm that DV and Base have the same frame count and frame rate
+    # Confirm that DV and Base have the same frame count, frame rate, and display dimensions
     dv_framerate = dv_track['frame_rate']
     base_framerate = base_track['frame_rate']
-    assert dv_framerate == base_framerate, f"Files do not have matching frame rates, {dv_path.name} has frame rate {dv_framerate} and {base_path.name} has frame rate {base_framerate}."
+    assert dv_framerate == base_framerate, f"Frame rates do not match, {dv_path.name} has frame rate {dv_framerate} and {base_path.name} has frame rate {base_framerate}."
     print(f"Both files have matching frame rates: {base_framerate}")
 
     dv_framecount = dv_track['frame_count']
     base_framecount = base_track['frame_count']
-    assert dv_framecount == base_framecount, f"Files do not have matching frame counts, {dv_path.name} has frame count {dv_framecount} and {base_path.name} has frame count {base_framecount}."
+    assert dv_framecount == base_framecount, f"Frame counts do not match, {dv_path.name} has frame count {dv_framecount} and {base_path.name} has frame count {base_framecount}."
     print(f"Both files have matching frame counts: {base_framecount}")
+
+    dim_mismatch_msg = f"Dimensions do not match, {dv_path.name} has dimensions {dv_track['width']}x{dv_track['height']} and {base_path.name} has dimensions {base_track['width']}x{base_track['height']}."
+    assert dv_track['width'] == base_track['width'] and dv_track['height'] == base_track['height'], dim_mismatch_msg
+    print(f"Both files have matching dimensions: {base_track['width']}x{base_track['height']}")
 
     print(f"Extracting HEVC stream from {dv_path.name}...")
     dv_stream = dv_path.stem + DV_STREAM_SUFFIX
