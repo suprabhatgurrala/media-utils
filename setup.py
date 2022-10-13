@@ -20,7 +20,8 @@ setup(
             'gifenc=gifenc:main',
             'merge_subs=merge_subs:main',
             'set_extra_thumbnail=plex_extras_thumbnail.set_extra_thumbnail:main',
-            'rename_chapters=rename_chapters:entrypoint'
+            'rename_chapters=rename_chapters:entrypoint',
+            'dv_hybrid=dv_hdr_hybrid.dv_hybrid:main'
         ],
     }
 )
