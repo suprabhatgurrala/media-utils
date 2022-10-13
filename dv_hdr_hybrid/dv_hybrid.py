@@ -1,13 +1,15 @@
 import argparse
-import os
 import sys
-import subprocess
+from pathlib import Path
+from subprocess import run, CalledProcessError
 
 from pymediainfo import MediaInfo
 
-DV_STREAM_TEMP = "dovi.hevc"
-BASE_STREAM_TEMP = "hdr10.hevc"
-RPU_TEMP = "RPU.bin"
+
+DV_STREAM_SUFFIX = "_dovi.hevc"
+BASE_STREAM_SUFFIX = "_hdr10.hevc"
+RPU_SUFFIX = "_RPU.bin"
+OUT_SUFFIX = "_injected.hevc"
 
 DV_P5_STR = "dvhe.05"
 
@@ -25,21 +27,21 @@ def main():
 
     args = parser.parse_args()
 
-    dv_path = os.path.realpath(args.dv)
-    assert os.path.exists(dv_path), f"Path to DV file does not exist: {dv_path}"
+    dv_path = Path(args.dv).resolve()
+    assert dv_path.exists(), f"Path to DV file does not exist: {dv_path}"
 
-    base_path = os.path.realpath(args.hdr10)
-    assert os.path.exists(base_path), f"Path to HDR10 base file does not exist: {base_path}"
+    base_path = Path(args.hdr10).resolve()
+    assert base_path.exists(), f"Path to HDR10 base file does not exist: {base_path}"
 
-    both_dirs = os.path.isdir(dv_path) and os.path.isdir(base_path)
-    both_files = os.path.isfile(dv_path) and os.path.isfile(base_path)
+    both_dirs = dv_path.is_dir() and base_path.is_dir()
+    both_files = dv_path.is_file() and base_path.is_file()
 
     assert both_dirs or both_files, "Paths to DV and HDR10 file(s) must both be directories or both be files."
 
     if both_dirs:
         print("Batch processing files in directories...")
-        dv_files = [s for s in os.listdir(dv_path) if os.path.splitext(s)[1] == ".mkv" or os.path.splitext(s)[1] == ".mp4"]
-        base_files = [s for s in os.listdir(base_path) if os.path.splitext(s)[1] == ".mkv" or os.path.splitext(s)[1] == ".mp4"]
+        dv_files = list(dv_path.glob("*.mkv")).extend(dv_path.glob("*.mp4"))
+        base_files = list(base_path.glob("*.mkv")).extend(base_path.glob("*.mp4"))
 
         dv_files.sort()
         base_files.sort()
@@ -47,59 +49,64 @@ def main():
         for i, (dv_file, base_file) in enumerate(zip(dv_files, base_files)):
             print(f"Processing file {i + 1} of {len(base_files)}")
             try:
-                create_hybrid(args.ffmpeg, args.dovi_tool, os.path.join(dv_path, dv_file), os.path.join(base_path, base_file), args.mkvextract, args.dv_name)
-            except subprocess.CalledProcessError as cpe:
+                create_hybrid(args.ffmpeg, args.dovi_tool, dv_file, base_file, args.mkvextract, args.dv_name)
+            except CalledProcessError as cpe:
                 print(f"Error for file {i + 1}: {cpe}")
             finally:
                 cleanup()
     else:
-        create_hybrid(args.ffmpeg, args.dovi_tool, dv_path, base_path, args.mkvextract, args.dv_name)
-        cleanup()
+        try:
+            create_hybrid(args.ffmpeg, args.dovi_tool, dv_path, base_path, args.mkvextract, args.dv_name)
+        except:
+            raise
+        finally:
+            cleanup()
 
 
 def cleanup():
     print("Cleaning up temp files...\n")
-    for f in [DV_STREAM_TEMP, BASE_STREAM_TEMP, RPU_TEMP]:
-        if os.path.exists(f):
-            os.remove(f)
+    for suffix in [DV_STREAM_SUFFIX, BASE_STREAM_SUFFIX, RPU_SUFFIX]:
+        for f in Path.cwd().glob(f"*{suffix}"):
+            f.unlink(missing_ok=True)
 
 
 def create_hybrid(ffmpeg, dovi_tool, dv_path, base_path, mkvextract=False, dv_name=False):
     dv_info = MediaInfo.parse(dv_path)
 
     if len(dv_info.video_tracks) > 1:
-        print("WARNING: Dolby Vision file has multiple video tracks, only using first track.")
+        print(f"WARNING: {dv_path.name} has multiple video tracks, only using first track.")
 
     dv_track = dv_info.video_tracks[0].to_data()
 
     # Confirm that DV file is profile 5
     assert dv_track['hdr_format_profile'] == DV_P5_STR, f"Dolby Vision file is not profile 5, expected {DV_P5_STR}, but was actually {dv_track['hdr_format_profile']}"
-    print(f"{os.path.basename(dv_path)} is a Profile 5 file.")
+    print(f"{dv_path.name} is a Profile 5 file.")
 
     base_info = MediaInfo.parse(base_path)
 
     if len(base_info.video_tracks) > 1:
-        print("WARNING: Base HDR10 file has multiple video tracks, only using first track.")
+        print(f"WARNING: {base_path.name} has multiple video tracks, only using first track.")
 
     base_track = base_info.video_tracks[0].to_data()
 
     # Confirm that DV and Base have the same frame count and frame rate
     dv_framerate = dv_track['frame_rate']
     base_framerate = base_track['frame_rate']
-    assert dv_framerate == base_framerate, f"Files do not have matching frame rates, DV file has frame rate {dv_framerate} and HDR10 base file has frame rate {base_framerate}."
+    assert dv_framerate == base_framerate, f"Files do not have matching frame rates, {dv_path.name} has frame rate {dv_framerate} and {base_path.name} has frame rate {base_framerate}."
     print(f"Both files have matching frame rates: {base_framerate}")
 
     dv_framecount = dv_track['frame_count']
     base_framecount = base_track['frame_count']
-    assert dv_framecount == base_framecount, f"Files do not have matching frame counts, DV file has frame count {dv_framecount} and HDR10 base file has frame count {base_framecount}."
+    assert dv_framecount == base_framecount, f"Files do not have matching frame counts, {dv_path.name} has frame count {dv_framecount} and {base_path.name} has frame count {base_framecount}."
     print(f"Both files have matching frame counts: {base_framecount}")
 
-    print(f"Extracting HEVC stream from {os.path.basename(dv_path)}...")
+    print(f"Extracting HEVC stream from {dv_path.name}...")
+    dv_stream = dv_path.stem + DV_STREAM_SUFFIX
     if mkvextract:
-        subprocess.run(["mkvextract", dv_path, "tracks", f"0:{DV_STREAM_TEMP}"], check=True)
+        run(["mkvextract", dv_path, "tracks", f"0:{dv_stream}"], check=True)
     else:
-        subprocess.run(
-            [ffmpeg, "-loglevel", "warning", "-hide_banner", "-stats", "-i", dv_path, "-c", "copy" ,"-vbsf", "hevc_mp4toannexb", DV_STREAM_TEMP],
+        run(
+            [ffmpeg, "-loglevel", "warning", "-hide_banner", "-stats", "-i", dv_path, "-c", "copy" ,"-vbsf", "hevc_mp4toannexb", dv_stream],
             check=True
         )
 
@@ -108,32 +115,30 @@ def create_hybrid(ffmpeg, dovi_tool, dv_path, base_path, mkvextract=False, dv_na
     else:
         base_framerate_str = base_framerate
 
-    print(f"Extracting HEVC stream from {os.path.basename(base_path)}...")
+    print(f"Extracting HEVC stream from {base_path.name}...")
+    base_stream = base_path.stem + BASE_STREAM_SUFFIX
     if mkvextract:
-        subprocess.run(["mkvextract", base_path, "tracks", f"0:{BASE_STREAM_TEMP}"], check=True)
+        run(["mkvextract", base_path, "tracks", f"0:{base_stream}"], check=True)
     else:
-        subprocess.run(
-            [ffmpeg, "-loglevel", "warning", "-hide_banner", "-stats", "-i", base_path, "-c", "copy", "-vbsf", f"hevc_metadata=tick_rate={base_framerate_str}:num_ticks_poc_diff_one=1", BASE_STREAM_TEMP],
+        run(
+            [ffmpeg, "-loglevel", "warning", "-hide_banner", "-stats", "-i", base_path, "-c", "copy", "-vbsf", f"hevc_metadata=tick_rate={base_framerate_str}:num_ticks_poc_diff_one=1", base_stream],
             check=True
         )
 
     print("Extracting Dolby Vision RPU...")
     # TODO: Handle cases where RPU conversion fails and metadata requires editing
-    subprocess.run(
-        [dovi_tool, "-m", "3", "extract-rpu", DV_STREAM_TEMP],
+    run(
+        [dovi_tool, "-m", "3", "extract-rpu", dv_stream, "-o", dv_path.stem + RPU_SUFFIX],
         check=True
     )
 
     print("Injecting DV metadata into HDR10 base...")
     if dv_name:
-        out_name_base = dv_path
+        out_name = dv_path.stem + OUT_SUFFIX
     else:
-        out_name_base = base_path
-    base_name = os.path.basename(out_name_base)
-    name, ext = os.path.splitext(base_name)
-    out_name = name + '_injected.hevc'
-    subprocess.run(
-        [dovi_tool, "inject-rpu", "-i", BASE_STREAM_TEMP, "--rpu-in", RPU_TEMP, "-o", out_name],
+        out_name = base_path.stem + OUT_SUFFIX
+    run(
+        [dovi_tool, "inject-rpu", "-i", base_stream, "--rpu-in", RPU_TEMP, "-o", out_name],
         check=True
     )
     print("Successfully created hybrid video stream!")
