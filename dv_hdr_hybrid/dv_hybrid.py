@@ -42,8 +42,10 @@ def main():
 
     if both_dirs:
         print("Batch processing files in directories...")
-        dv_files = list(dv_path.glob("*.mkv")).extend(dv_path.glob("*.mp4"))
-        base_files = list(base_path.glob("*.mkv")).extend(base_path.glob("*.mp4"))
+        dv_files = list(dv_path.glob("*.mkv"))
+        dv_files.extend(dv_path.glob("*.mp4"))
+        base_files = list(base_path.glob("*.mkv"))
+        base_files.extend(base_path.glob("*.mp4"))
 
         dv_files.sort()
         base_files.sort()
