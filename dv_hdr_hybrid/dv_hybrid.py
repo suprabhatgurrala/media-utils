@@ -68,10 +68,10 @@ def main():
 
 
 def cleanup():
-    print("Cleaning up temp files...\n")
     for suffix in [DV_STREAM_SUFFIX, BASE_STREAM_SUFFIX, RPU_SUFFIX, EDIT_SUFFIX, RPU_EDITED_SUFFIX]:
         for f in Path.cwd().glob(f"*{suffix}"):
             f.unlink(missing_ok=True)
+    print("Cleaned up temp files.\n")
 
 
 def create_hybrid(ffmpeg, dovi_tool, dv_path, base_path, mkvextract=False, dv_name=False):
@@ -118,8 +118,7 @@ def create_hybrid(ffmpeg, dovi_tool, dv_path, base_path, mkvextract=False, dv_na
             check=True
         )
 
-    print("Extracting Dolby Vision RPU...")
-    # TODO: Handle cases where RPU conversion fails and metadata requires editing
+    print("Extracting and converting Dolby Vision RPU...")
     rpu_bin = Path(dv_path.stem + RPU_SUFFIX)
     try:
         run([dovi_tool, "-m", "3", "extract-rpu", dv_stream, "-o", rpu_bin], check=True)
