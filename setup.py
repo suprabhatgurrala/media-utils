@@ -21,7 +21,8 @@ setup(
             'merge_subs=merge_subs:main',
             'set_extra_thumbnail=plex_extras_thumbnail.set_extra_thumbnail:main',
             'rename_chapters=rename_chapters:entrypoint',
-            'dv_hybrid=dv_hdr_hybrid.dv_hybrid:main'
+            'dv_hybrid=dv_hdr_hybrid.dv_hybrid:main',
+            'merge_hybrid=dv_hdr_hybrid.merge_hybrid:main'
         ],
     }
 )
