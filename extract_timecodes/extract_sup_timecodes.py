@@ -2,6 +2,8 @@ import argparse
 from itertools import pairwise
 from pathlib import Path
 
+from tqdm import tqdm
+
 from extract_timecodes.pgsreader import PGSReader
 
 
@@ -43,7 +45,7 @@ def extract_timecodes(sup_filepath, outpath):
 
     j = 1
 
-    for ds, next_ds in pairwise(ds_iter):
+    for ds, next_ds in tqdm(pairwise(ds_iter)):
         if len(ds.ods) > 0:
             start_ms = ds.ods[0].presentation_timestamp
             end_ms = next_ds.wds[0].presentation_timestamp
