@@ -33,7 +33,7 @@ def main():
 
 	yt = False
 	if args.thumbnail[0:4] == "http":
-		t = Thumbnail('http://www.youtube.com/watch?v=2m1drlOZSDw')
+		t = Thumbnail(args.thumbnail)
 		t.fetch()
 		thumb_path = Path(t.save('.', overwrite=True))
 		yt = True
@@ -66,14 +66,22 @@ def main():
 
 	print("Searching for matching thumbnail path...")
 	thumb_paths = []
+	closest_thumb = None
+	min_delta = float('inf')
 	for thumb in tqdm(plex_media_path.rglob("thumb1.jpg")):
 		thumb_time = datetime.fromtimestamp(thumb.stat().st_mtime)
 
-		if abs(thumb_time - target_time).total_seconds() < 120:
+		delta = abs(thumb_time - target_time).total_seconds()
+
+		if delta < 120:
 			thumb_paths.append(thumb)
+		if delta < min_delta:
+			closest_thumb = thumb_time, thumb
+			min_delta = delta
 
 	if len(thumb_paths) == 0:
 		print("\nCould not find matching thumbnail path.")
+		print(f"Closest thumbnail to edit time is: {closest_thumb[0]}\n{closest_thumb[1]}")
 		sys.exit()
 	elif len(thumb_paths) > 1:
 		print("There are multiple possible matching thumbnail paths:")
