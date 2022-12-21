@@ -62,7 +62,7 @@ def main():
             if track_uid.text in track_tags_to_append:
                 for key, val in track_tags_to_append[track_uid.text]:
                     tag.append(generate_simple(key, val))
-        else:
+        elif args.general_tags:
             for gen_tag in args.general_tags:
                 key, val = gen_tag.split('=', 1)
                 tag.append(generate_simple(key, val))
