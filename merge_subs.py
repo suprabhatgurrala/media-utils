@@ -5,7 +5,7 @@ import sys
 from pymediainfo import MediaInfo
 
 def main():
-    parser = argparse.ArgumentParser(description="Intelligently merge MKV files with corresponding subtitle files.")
+    parser = argparse.ArgumentParser(description="Intelligently merge MKV/MP4 files with corresponding subtitle files.")
     parser.add_argument('outpath', type=str, help="Output path for merged files.")
     # TODO
     # parser.add_argument('--no-subs', action='store_true',
