@@ -35,6 +35,11 @@ def main():
 
     assert args.general_tags or args.track_tags, "No tags specified, specify at least one tag to append using either --general-tags or --track-tags."
 
+    if args.general_tags is None:
+        gen_tags_to_append = []
+    else:
+        gen_tags_to_append = args.general_tags
+
     track_tags_to_append = {}
     if args.track_tags:
         # If track specific tags are passed in, parse them and map them to track UIDs
@@ -56,17 +61,23 @@ def main():
     tree = ET.parse(xml_filename)
     root = tree.getroot()
 
+    gen_tag_found = False
+
     for tag in root.iter("Tag"):
         track_uid = tag.find("./Targets/TrackUID")
         if track_uid is not None:
             if track_uid.text in track_tags_to_append:
                 for key, val in track_tags_to_append[track_uid.text]:
                     tag.append(generate_simple(key, val))
-        elif args.general_tags:
-            for gen_tag in args.general_tags:
+        else:
+            gen_tag_found = True
+            for gen_tag in gen_tags_to_append:
                 key, val = gen_tag.split('=', 1)
                 tag.append(generate_simple(key, val))
 
+    if not gen_tag_found:
+        # No existing general tags, we must create one
+        root.append(generate_tag(gen_tags_to_append))
     
     xml_out_filename = input_file.stem + OUTPUT_SUFFIX
     with open(xml_out_filename, "w+") as f:
@@ -94,6 +105,37 @@ def generate_simple(key, value):
     tree.end("String")
     tree.end("Simple")
     return tree.close()
+
+
+def generate_tag(general_tags):
+    """
+    Generate the full tag structure for general (non-track specific) tags.
+
+    <Tag>                                 
+        <Targets>
+            <TargetTypeValue>50</TargetTypeValue>
+        </Targets>
+        <Simple>
+            <Name>key</Name>
+            <String>value</String>
+        </Simple>
+    </Tag>
+    """
+    tree = ET.TreeBuilder()
+    tree.start("Tag", {})
+    tree.start("Targets", {})
+    tree.start("TargetTypeValue", {})
+    tree.data("50")
+    tree.end("TargetTypeValue")
+    tree.end("Targets")
+    tree.end("Tag")
+    tag = tree.close()
+
+    for gen_tag in general_tags:
+        key, val = gen_tag.split('=', 1)
+        tag.append(generate_simple(key, val))
+    
+    return tag
 
 
 def get_track_uid_from_selector(media_info, track_selector):
@@ -128,6 +170,7 @@ def entrypoint():
     except:
         raise
     finally:
+        pass
         cleanup()
         
 
